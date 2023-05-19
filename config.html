@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+
+<script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+
+<script>
+  function getYamlFileName() {
+    $.post("http://192.168.1.82:8802/simple_get_files", '{ "paths": ["/etc/benniao"] }', function(data) {
+      var json_text = data;//获取到服务端返回的数据
+      var json = JSON.parse(json_text);
+
+      clearElementChild(document.getElementById("yaml_file_list"));
+      document.getElementById("yaml_file_list").style.display = "";
+
+      clearElementChild(document.getElementById("key_value_table"));
+      clearElementChild(document.getElementById("full_path_line"));
+
+      document.getElementById("last_button").style.display = "none";
+
+      for(var i = 0; i < json.items.length; i++) {
+        addLine(json.items[i]);
+      }
+    })  
+  }
+
+  function getYamlFileContain(filepath) {
+    $.post("http://192.168.1.82:8802/simple_get_items", '{ "file": "' + filepath + '" }', function(data) {
+      //hind yaml names
+      document.getElementById("yaml_file_list").style.display = "none";//隐藏文件列表
+      document.getElementById("last_button").style.display = "";//显示返回键
+
+      clearElementChild(document.getElementById("key_value_table"))
+
+      var new_node_path = document.createElement("a");
+      new_node_path.innerHTML = filepath;
+      full_path_line.appendChild(new_node_path);
+
+      var json_text = data;//获取到服务端返回的数据
+      json_text = json_text.replace(/\\t/g, "");
+      var json_obj = JSON.parse(json_text);
+
+      json_obj = json_obj["data"];
+      showKeyValueTableInObject(json_obj);
+    })
+
+  }
+
+
+  function handleSubmitValueButton(key) {
+    var input = document.getElementById("value_of_" + key);
+    console.log("handle submit button, key: [" + key + "], value: [" + input.value + "]");
+
+    var key_text = getCurrentFullPath();
+    key_text = key_text + "." + key;
+
+    modifyValue(key_text, input.value);
+  }
+
+  //读取full_path_line的字段，删掉最后两个Child。然后读取yaml文件，循着路径一路走下去，如果没有路径，则直接提示路径失效
+  function handleLastButton() {
+
+    var full_path_line = document.getElementById("full_path_line");
+    var path_child_nodes = full_path_line.childNodes;
+    var length = path_child_nodes.length;
+
+    if(length > 1) {  //read file contain
+      for(var i = length - 1; i >= length - 2; i--) {
+      full_path_line.removeChild(path_child_nodes[i]);
+      }
+
+      var file_path = path_child_nodes[0].innerHTML;
+
+      $.post("http://192.168.1.82:8802/simple_get_items", '{ "file": "' + file_path + '" }', function(data) {
+        var json_text = data;//获取到服务端返回的数据
+        var json_obj = JSON.parse(json_text);
+
+        json_obj = json_obj["data"];
+        var child_nodes = full_path_line.childNodes;
+        for(var i = 2; i < child_nodes.length; i += 2) {
+          json_obj = json_obj[child_nodes[i].innerHTML];
+        }
+
+        if(Array.isArray(json_obj)) {
+          showKeyValueTableInArray(json_obj);
+        } else {
+          showKeyValueTableInObject(json_obj);
+        }
+      })
+      return;
+    }
+
+    //read file names 
+    getYamlFileName();
+  }
+
+  //新增key-value列表的一行数据
+  //input是一个json对象
+  function addKeyValueLine(key, element) {
+    if(typeof(element.length) == "undefined") { //如果长度不存在，表示这是一个对象
+      var new_line = document.createElement("p");
+      var new_more_button = document.createElement("button");
+      new_more_button.innerHTML = "object";
+
+      var json_text = JSON.stringify(element);
+      new_more_button.setAttribute("onclick", "handleJoinJsonObject('" + key + "', '" + json_text + "')");
+
+      var new_key_text = document.createElement("a");
+      new_key_text.innerHTML = key + ": ";
+      
+      new_line.appendChild(new_key_text);
+      new_line.appendChild(new_more_button);
+      document.getElementById("key_value_table").appendChild(new_line);
+    } else if(Array.isArray(element)) { //是数组
+      var new_line = document.createElement("p");
+      var new_more_button = document.createElement("button");
+      new_more_button.innerHTML = "array";
+
+      var json_text = JSON.stringify(element);
+      new_more_button.setAttribute("onclick", "handleJoinJsonArray('" + key + "', '" + json_text + "')")
+    
+      var new_key_text = document.createElement("a");
+      new_key_text.innerHTML = key + ": ";
+
+
+      new_line.appendChild(new_key_text);
+      new_line.appendChild(new_more_button);
+
+      document.getElementById("key_value_table").appendChild(new_line);
+
+    } else {//是数值
+      var new_line = document.createElement("p");
+      var new_key_text = document.createElement("a");
+      new_key_text.innerHTML = key + ": ";
+      var new_value_input = document.createElement("input");
+      new_value_input.id = "value_of_" + key;
+      new_value_input.value = element;
+
+      var new_submit_button = document.createElement("button");
+      new_submit_button.innerHTML = "修改";
+      new_submit_button.setAttribute("onclick", "handleSubmitValueButton('" + key + "')");
+
+      new_line.appendChild(new_key_text);
+      new_line.appendChild(new_value_input);
+      new_line.appendChild(new_submit_button);
+      document.getElementById("key_value_table").appendChild(new_line);
+    }
+  }
+
+  //清空展示展示一个节点的所有数据，其中如果是值则显示输入框及修改，如果是对象则显示object，如果是数组则显示array的按钮
+  function showKeyValueTableInObject(json_obj) {
+    clearElementChild(document.getElementById("key_value_table"))
+
+    for(var element in json_obj) {
+      addKeyValueLine(element, json_obj[element]);
+    }
+  }
+
+  function showKeyValueTableInArray(this_json_obj) {
+    //1 首先把table原有的数据删除
+    var key_value_table = document.getElementById("key_value_table");
+    clearElementChild(key_value_table);
+
+    for(var i = 0; i < this_json_obj.length; i++) {//遍历数组的元素
+      var new_array_flag = document.createElement("p");
+      new_array_flag.innerHTML = "--";
+      key_value_table.appendChild(new_array_flag);
+
+      var obj = this_json_obj[i];
+      //数组的元素可能直接就是一个数值，也可能还是一个对象
+      if(typeof(obj.length) == "undefined") { //是一个对象
+        //对象下面直接就是key-value了
+        for(var key in obj) {
+          addKeyValueLine(i + "." + key, obj[key]);
+        }
+      } else {
+        //直接就是value
+        var new_line = document.createElement("p");
+
+        var value_input = document.createElement("input");
+        value_input.setAttribute("value", obj);
+        value_input.setAttribute("key", i);
+        value_input.id = "value_of_" + i; 
+
+        var modify_button = document.createElement("button");
+        modify_button.innerHTML = "修改";
+        var full_key_text = 
+        modify_button.setAttribute("onclick", "handleSubmitValueButton('" + i + "')")
+        new_line.appendChild(value_input);
+        new_line.appendChild(modify_button);
+        key_value_table.appendChild(new_line);
+      }
+    }
+  }
+
+  function modifyValue(key, value) {
+    var json_obj = new Object();
+    json_obj["file"] = document.getElementById("full_path_line").childNodes[0].innerHTML;
+
+    var change_obj = new Object();
+    change_obj["key"] = key;
+    change_obj["value"] = value;
+
+    var changes_array = new Array();
+    changes_array[0] = change_obj;
+
+    json_obj["changes"] = changes_array;
+
+    var json_text = JSON.stringify(json_obj);
+    $.post('http://192.168.1.82:8802/simple_set_items', json_text, function(data) {
+      console.log(data);
+    })
+  }
+
+  function getCurrentFullPath() {
+    var full_path_text = "";
+
+    var nodes = document.getElementById("full_path_line").childNodes;
+    for(var i = 2; i < nodes.length; i += 2) {
+      full_path_text = full_path_text + nodes[i].innerHTML + ".";
+    }
+    if(full_path_text.length > 0) {
+      full_path_text = full_path_text.slice(0, -1);
+    }
+
+    return full_path_text;
+  }
+
+  function appendPath(path_node) {
+    var node_path_text = document.createElement("a");
+    node_path_text.innerHTML = path_node;
+    var path_splipt_flag = document.createElement("a");
+    path_splipt_flag.innerHTML = ">";
+    full_path_line = document.getElementById("full_path_line");
+    full_path_line.appendChild(path_splipt_flag);//记录路径
+    full_path_line.appendChild(node_path_text);//记录路径
+  }
+
+  //数组也有对象
+  function handleJoinJsonArray(this_json_key, this_json_text) {
+    appendPath(this_json_key);//记录路径
+
+    var this_json_obj = JSON.parse(this_json_text);
+    showKeyValueTableInArray(this_json_obj)
+
+    document.getElementById("last_button").style.display = "";
+  }
+
+  function handleJoinJsonObject(this_json_key, this_json_text) {
+    console.log(this_json_text);
+
+    appendPath(this_json_key);//记录路径
+
+    var this_json_obj = JSON.parse(this_json_text);
+    showKeyValueTableInObject(this_json_obj);
+
+    //点击last button之后是重新读取该文件，然后按照路径
+    document.getElementById("last_button").style.display = "";//show
+  }
+
+  function clearElementChild(element) {
+    if(!element) {
+      return;
+    }
+
+    var nodes = element.childNodes;
+    for(var i = nodes.length - 1; i >= 0; i--) {
+      element.removeChild(nodes[i]);
+    }
+  }
+
+  function addLine(item) {
+    var new_item = document.createElement("li");
+    var text = document.createElement("button");
+    text.setAttribute("onclick", "getYamlFileContain('" + item + "')");
+    text.innerHTML = item;
+    new_item.appendChild(text);
+    document.getElementById("yaml_file_list").appendChild(new_item);
+  }
+</script>
+
+
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+   <title>configcenter</title>
+</head>
+
+<body onload="getYamlFileName()">
+
+<p> <a id="full_path_line"></a> <button id="last_button" onclick="handleLastButton()", style="display: none;"> 返回 </button> </p>
+<ol id="yaml_file_list"></ol>
+<p id="key_value_table"></p>
+
+
+<p id="error_text"></p>
+
+</body>
