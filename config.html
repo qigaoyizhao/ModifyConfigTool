@@ -4,40 +4,68 @@
 
 <script>
   function getYamlFileName() {
-    $.post("http://192.168.1.82:8802/simple_get_files", '{ "paths": ["/etc/benniao"] }', function(data) {
-      var json_text = data;//获取到服务端返回的数据
-      var json = JSON.parse(json_text);
+    // $.post("http://192.168.1.82:8802/simple_get_files", '{ "paths": ["/etc/benniao"] }', function(data) {
+    //   var json_text = data;//获取到服务端返回的数据
+    //   var json = JSON.parse(json_text);
 
-      clearElementChild(document.getElementById("yaml_file_list"));
-      document.getElementById("yaml_file_list").style.display = "";
+    //   clearElementChild(document.getElementById("yaml_file_list"));
+    //   document.getElementById("yaml_file_list").style.display = "";
 
-      clearElementChild(document.getElementById("key_value_table"));
-      clearElementChild(document.getElementById("full_path_line"));
+    //   clearElementChild(document.getElementById("key_value_table"));
+    //   clearElementChild(document.getElementById("full_path_line"));
 
-      for(var i = 0; i < json.items.length; i++) {
-        addLine(json.items[i]);
-      }
-    })  
+    //   for(var i = 0; i < json.items.length; i++) {
+    //     addLine(json.items[i]);
+    //   }
+    // })
+
+    var json_text = '{"items":["a.yaml"],"status":"success"}';//获取到服务端返回的数据
+    var json = JSON.parse(json_text);
+
+    clearElementChild(document.getElementById("yaml_file_list"));
+    document.getElementById("yaml_file_list").style.display = "";
+
+    clearElementChild(document.getElementById("key_value_table"));
+    clearElementChild(document.getElementById("full_path_line"));
+
+    for(var i = 0; i < json.items.length; i++) {
+      addLine(json.items[i]);
+    }
   }
 
   function getYamlFileContain(filepath) {
-    $.post("http://192.168.1.82:8802/simple_get_items", '{ "file": "' + filepath + '" }', function(data) {
-      //hind yaml names
-      document.getElementById("yaml_file_list").style.display = "none";//隐藏文件列表
+    // $.post("http://192.168.1.82:8802/simple_get_items", '{ "file": "' + filepath + '" }', function(data) {
+    //   //hind yaml names
+    //   document.getElementById("yaml_file_list").style.display = "none";//隐藏文件列表
 
-      clearElementChild(document.getElementById("key_value_table"))
+    //   clearElementChild(document.getElementById("key_value_table"))
 
-      var new_node_path = document.createElement("a");
-      new_node_path.innerHTML = filepath;
-      full_path_line.appendChild(new_node_path);
+    //   var new_node_path = document.createElement("a");
+    //   new_node_path.innerHTML = filepath;
+    //   full_path_line.appendChild(new_node_path);
 
-      var json_text = data;//获取到服务端返回的数据
-      json_text = json_text.replace(/\\t/g, "");
-      var json_obj = JSON.parse(json_text);
+    //   var json_text = data;//获取到服务端返回的数据
+    //   json_text = json_text.replace(/\\t/g, "");
+    //   var json_obj = JSON.parse(json_text);
 
-      json_obj = json_obj["data"];
-      listKeyAndValue(0, "", json_obj);
-    })
+    //   json_obj = json_obj["data"];
+    //   listKeyAndValue(0, "", json_obj);
+    // })
+
+    document.getElementById("yaml_file_list").style.display = "none";//隐藏文件列表
+
+    clearElementChild(document.getElementById("key_value_table"))
+
+    var new_node_path = document.createElement("a");
+    new_node_path.innerHTML = filepath;
+    full_path_line.appendChild(new_node_path);
+    var data = '{"file":"a.yaml","data":{"a":{"b":"hello","c":[{"name":123,"age":321},{"name":789}]},"c":{"d":{"e":{"f":789}}},"human":789,"error":404,"fitkits":888,"d":[123,456],"e":["name","age","hello"]}}'
+    var json_text = data;//获取到服务端返回的数据
+    json_text = json_text.replace(/\\t/g, "");
+    var json_obj = JSON.parse(json_text);
+
+    json_obj = json_obj["data"];
+    listKeyAndValue(0, "", json_obj);
 
   }
 
@@ -77,12 +105,7 @@
 
   function addArrayFlagLine(layerNumber) {
     var new_line = document.createElement("p");
-
-    for(var i = 0; i < layerNumber; i++) {
-      var placeholder = document.createElement("a");
-      placeholder.innerHTML = "    ";//4个空格
-      new_line.appendChild(placeholder);
-    }
+    new_line.style = "padding-left:" + layerNumber + "em";
 
     var array_flag = document.createElement("a");
     array_flag.innerHTML = "--";
@@ -93,12 +116,7 @@
 
   function addArrayValueLine(layerNumber, full_key, value) {
     var new_line = document.createElement("p");
-
-    for(var i = 0; i < layerNumber; i++) {
-      var placeholder = document.createElement("a");
-      placeholder.innerHTML = "    ";//4个空格
-      new_line.appendChild(placeholder);
-    }
+    new_line.style = "padding-left:" + layerNumber + "em";
 
     var array_flag = document.createElement("a");
     array_flag.innerHTML = "--";
@@ -120,14 +138,9 @@
   //input是一个json对象
   function addKeyValueLine(layerNumber, full_key, element) {
     var new_line = document.createElement("p");
+    new_line.style = "padding-left:" + layerNumber + "em";
 
-    for(var i = 0; i < layerNumber; i++) {
-      var placeholder = document.createElement("a");
-      placeholder.innerHTML = "    ";//4个空格
-      new_line.appendChild(placeholder);
-    }
-
-    if(Object.isObject(element)) { //表示这element是一个对象
+    if($.isPlainObject(element)) { //表示这element是一个对象
       var new_key_text = document.createElement("a");
       var key = getLastKey(full_key);
       new_key_text.innerHTML = key + ": ";
@@ -146,10 +159,10 @@
       document.getElementById("key_value_table").appendChild(new_line);
 
       for(var i = 0; i < element.length; i++) {
-        if(Object.isObject(element[i])) {
+        if($.isPlainObject(element[i])) {
           //如果数组的元素是对象，再丢给listKeyAndValue
           addArrayFlagLine(layerNumber + 1);
-          listKeyAndValue(layerNumber + 1, appendKey(full_key, i), element);
+          listKeyAndValue(layerNumber + 1, appendKey(full_key, i), element[i]);
         } else if (Array.isArray(element[i])) {
           console.log("element of array is array!!!unbeliveble!!");
           //如果数组的元素是数组，再决定
@@ -211,19 +224,6 @@
     return full_path_text;
   }
 
-  // function appendPath(path_node) {
-  //   var node_path_text = document.createElement("a");
-  //   node_path_text.innerHTML = path_node;
-  //   var path_splipt_flag = document.createElement("a");
-  //   path_splipt_flag.innerHTML = ">";
-  //   full_path_line = document.getElementById("full_path_line");
-  //   full_path_line.appendChild(path_splipt_flag);//记录路径
-  //   full_path_line.appendChild(node_path_text);//记录路径
-  // }
-
-
-
-
   function clearElementChild(element) {
     if(!element) {
       return;
@@ -244,10 +244,6 @@
     document.getElementById("yaml_file_list").appendChild(new_item);
   }
 
-  function test_lastkey() {
-    var key = getLastKey("hello.xianqi.ge.niubi!!.good");
-    console.log(key);
-  }
 </script>
 
 
@@ -266,6 +262,4 @@
 
 <p id="error_text"></p>
 
-
-<button onclick="test_lastkey()"> test last key</button>
 </body>
